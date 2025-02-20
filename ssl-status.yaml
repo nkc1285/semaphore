@@ -4,36 +4,34 @@
   vars:
     ssl_port: 443
     expiry_threshold: 30
-  roles:
-    - name: check_ssl_expiry
-      tasks:
-        - name: Check SSL certificates
-          openssl_certificate:
-            host: "{{ inventory_hostname }}"
-            port: "{{ ssl_port }}"
-            select_crypto_backend: pyopenssl
-            validate_certs: no
-          ignore_errors: yes
-          register: cert_status
+  tasks:
+    - name: Check SSL certificates
+      openssl_certificate:
+        host: "{{ inventory_hostname }}"
+        port: "{{ ssl_port }}"
+        select_crypto_backend: pyopenssl
+        validate_certs: no
+      ignore_errors: yes
+      register: cert_status
 
-        - name: Display expiry information
-          debug:
-            msg: "Certificate for {{ inventory_hostname }} expires on {{ cert_status.not_after | default('Unknown') }}"
-          when: cert_status.not_after is defined
+    - name: Display expiry information
+      debug:
+        msg: "Certificate for {{ inventory_hostname }} expires on {{ cert_status.not_after | default('Unknown') }}"
+      when: cert_status.not_after is defined
 
-        - name: Calculate days until expiry
-          set_fact:
-            days_until_expiry: "{{ ((cert_status.not_after | to_datetime('%Y%m%d%H%M%SZ')) - ansible_date_time.iso8601 | to_datetime).days }}"
-          when: cert_status.not_after is defined
+    - name: Calculate days until expiry
+      set_fact:
+        days_until_expiry: "{{ ((cert_status.not_after | to_datetime('%Y%m%d%H%M%SZ')) - ansible_date_time.iso8601 | to_datetime).days }}"
+      when: cert_status.not_after is defined
 
-        - name: Send alert for expiring certificates
-          debug:
-            msg: "Warning: Certificate for {{ inventory_hostname }} expires in {{ days_until_expiry }} days!"
-          when: 
-            - cert_status.not_after is defined
-            - days_until_expiry | int <= expiry_threshold
+    - name: Send alert for expiring certificates
+      debug:
+        msg: "Warning: Certificate for {{ inventory_hostname }} expires in {{ days_until_expiry }} days!"
+      when: 
+        - cert_status.not_after is defined
+        - days_until_expiry | int <= expiry_threshold
 
-        - name: Alert for certificate check failures
-          debug:
-            msg: "Error: Unable to check certificate for {{ inventory_hostname }}"
-          when: cert_status.failed | default(false)
+    - name: Alert for certificate check failures
+      debug:
+        msg: "Error: Unable to check certificate for {{ inventory_hostname }}"
+      when: cert_status.failed | default(false)
